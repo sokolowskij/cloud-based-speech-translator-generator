@@ -1,0 +1,33 @@
+<nav class="navbar navbar-expand-lg navbar-light bg-light">
+    <h1>CBSTG</h1>
+    <button class="navbar-toggler" type="button" data-toggle="collapse" data-target="#navbarNavDropdown"
+            aria-controls="navbarNavDropdown" aria-expanded="false" aria-label="Toggle navigation">
+        <span class="navbar-toggler-icon"></span>
+    </button>
+    <div class="collapse navbar-collapse" id="navbarNavDropdown">
+        <ul class="navbar-nav mx-auto">
+            <li class="nav-item">
+                <a class="nav-link" href="/">Home <span class="sr-only">(current)</span></a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link" href="/text">Text Translation</a>
+            </li>
+<!--            <li class="nav-item">-->
+<!--                <a class="nav-link" href="">Speech Translation</a>-->
+<!--            </li>-->
+<!--            <li class="nav-item">-->
+<!--                <a class="nav-link" href="">Speech generation</a>-->
+<!--            </li>-->
+        </ul>
+        <div>
+            {% if request.user.is_authenticated %}
+                <div class="greeting">Welcome {{ request.user.username }}</div>
+                <div class="d-flex justify-content-center">
+                    <a role="button" href="{% url 'logout_view' %}" class="btn btn-outline-secondary">Log out</a>
+                </div>
+            {% else %}
+                <div class="d-flex justify-content-center">User not logged in</div>
+            {% endif %}
+        </div>
+    </div>
+</nav>

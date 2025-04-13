@@ -1,0 +1,75 @@
+.greeting {
+    font-size: large;
+    font-weight: bold;
+}
+
+.container {
+    width: 80%;
+    text-align: center;
+}
+
+h2 {
+    text-align: center;
+    border-bottom: 2px solid black;
+    padding-bottom: 4px;
+}
+
+.controls_row {
+    border-bottom: 2px solid black;
+    padding-bottom: 4px;
+    margin-bottom: 6px;
+}
+
+h4 {
+    text-align: center;
+}
+
+h3 {
+    text-align: center;
+}
+
+ul {
+    text-align: center;
+    font-size: x-large;
+}
+
+.asteriskField {
+    display: none;
+}
+
+.registration_form ul {
+    font-size: medium;
+}
+
+#id_content {
+    width: 80%;
+    height: 200px;
+}
+
+
+.fa-circle-check {
+    color: green;
+}
+
+.fa-circle-xmark {
+    color: red;
+}
+
+.disappear {
+    display: none;
+}
+
+footer {
+    margin-top: auto;
+}
+
+body {
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+}
+
+.dropdown-header {
+    font-size: large;
+    font-weight: bold;
+}

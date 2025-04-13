@@ -1,0 +1,20 @@
+{% extends 'index.html' %}
+
+{% block content %}
+    {% load crispy_forms_tags %}
+    <div class="container">
+        <h3 class="py-3">Registration page</h3>
+        <div class="d-flex justify-content-center">
+            <form method="POST" class="registration_form">
+                {% csrf_token %}
+                {{ form.username|as_crispy_field }}
+                {{ form.email|as_crispy_field }}
+                {{ form.password1|as_crispy_field }}
+                {{ form.password2|as_crispy_field }}
+                <div class="d-flex justify-content-center">
+                    <button type="submit" class="btn btn-outline-primary my-2">Create new account</button>
+                </div>
+            </form>
+        </div>
+    </div>
+{% endblock %}
