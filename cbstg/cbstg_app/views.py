@@ -20,7 +20,7 @@ def submit_text(request):
             submitted_text = form.save(commit=False)
             submitted_text.user = request.user
             submitted_text.save()
-            return redirect('text_translations_view')
+            return redirect('text_to_speech')
     else:
         form = SubmittedTextForm()
     return render(request, 'translation/submit_text.html', {'form': form})
@@ -40,8 +40,6 @@ def download_submitted_text(request, text_id):
     if settings.SERVICE_NAME is None:  # local development
         storage_client = storage.Client(credentials=settings.GS_CREDENTIALS)
     else:
-        # cloud development, doesnt work without credentials file,
-        # figure out how to get credentials in terraform and pass to env?
         storage_client = storage.Client()
 
     bucket = storage_client.bucket(settings.GS_BUCKET_NAME)

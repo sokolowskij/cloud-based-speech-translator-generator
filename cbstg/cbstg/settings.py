@@ -1,15 +1,14 @@
 import io
-import os
 from urllib.parse import urlparse
 
 import environ
 import google.auth
 import requests
 from google.cloud.run_v2.services.services.client import ServicesClient
-
+from google.oauth2 import service_account
 
 from .basesettings import *
-
+import local_secrets
 
 env = environ.Env()
 if env("APPLICATION_SETTINGS", default=None):
@@ -75,4 +74,24 @@ if GS_BUCKET_NAME := env("MEDIAFILES_BUCKET_NAME", default=None):
         }
 
 else:
-    GS_BUCKET_NAME = local_secrets.GS_BUCKET_NAME
+    SECRET_KEY = local_secrets.SECRET_KEY
+    MEDIA_URL = f"https://storage.googleapis.com/{local_secrets.GS_BUCKET_NAME}/"
+
+    GS_CREDENTIALS = service_account.Credentials.from_service_account_file(
+        os.path.join(BASE_DIR, local_secrets.BUCKET_CREDENTIALS_PATH)
+    )
+    DEFAULT_FILE_STORAGE = 'storages.backends.gcloud.GoogleCloudStorage'
+
+    STORAGES = {
+        "default": {
+            "BACKEND": "storages.backends.gcloud.GoogleCloudStorage",
+            "OPTIONS": {
+                "project_id": local_secrets.PROJECT_ID,
+                "bucket_name": local_secrets.GS_BUCKET_NAME,
+                "credentials": GS_CREDENTIALS
+            },
+        },
+        "staticfiles": {
+            "BACKEND": "django.contrib.staticfiles.storage.StaticFilesStorage",
+        },
+    }

@@ -2,7 +2,7 @@
 {% block content %}
     {% load crispy_forms_tags %}
     {% load custom_tags %}
-    <div class="container pt-3"><h2>Your text translations</h2>
+    <div class="container pt-3"><h2>Your Text-To-Speech conversions</h2>
         {% if texts_queryset %}
             <table class="table">
             <tr>
@@ -29,7 +29,7 @@
         {% endif %}
 
         <div class="d-flex justify-content-center">
-            <a role="button" href="{% url 'create_new_text_translation_view' %}" class="btn btn-outline-primary">Create new note</a>
+            <a role="button" href="{% url 'create_new_speech_from_text' %}" class="btn btn-outline-primary">Submit new file</a>
         </div>
     </div>
 

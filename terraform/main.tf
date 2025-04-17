@@ -376,7 +376,6 @@ resource "google_cloud_run_v2_service" "app" {
     annotations = {
       "run.googleapis.com/cloudsql-instances" = google_sql_database_instance.postgres_instance.connection_name
       "run.googleapis.com/client-name"        = "terraform"
-      "autoscaling.knative.dev/maxScale"      = "1"
     }
   }
   depends_on = [
