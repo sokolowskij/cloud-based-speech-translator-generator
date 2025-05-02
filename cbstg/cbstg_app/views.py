@@ -3,10 +3,10 @@ from datetime import timedelta
 from django.conf import settings
 from django.contrib.auth.models import User
 from django.core.exceptions import ObjectDoesNotExist
-from django.http import Http404, HttpResponseRedirect
+from django.http import Http404, HttpResponseRedirect, JsonResponse
 from django.shortcuts import render, redirect
 from django.contrib.auth.decorators import login_required
-from google.cloud import storage
+from google.cloud import storage, speech
 
 from .forms import SubmittedTextForm, TranslatedTextForm
 from .models import SubmittedText
@@ -72,4 +72,28 @@ def mytexts_view(request):
 #     note.delete()
 #
 #     return redirect("mynotes_view")
+@login_required(login_url="/login")
+def myaudio_view(request):
+    user = User.objects.get(pk=request.user.id)
+    try:
+        texts = SubmittedText.objects.filter(user=user)
+    except ObjectDoesNotExist:
+        texts = None
+    return render(request, 'speechtotext/myaudio.html', {"texts_queryset": texts})
+
+
+@login_required(login_url="/login")
+def submit_audio(request):
+    if request.method == 'POST' and request.FILES.get('audio_file'):
+        client = speech.SpeechClient()
+        audio = speech.RecognitionAudio(content=request.FILES['audio_file'].read())
+        config = speech.RecognitionConfig(
+            encoding=speech.RecognitionConfig.AudioEncoding.LINEAR16,
+            language_code="en-US"
+        )
+        response = client.recognize(config=config, audio=audio)
+
+        transcript = " ".join([result.alternatives[0].transcript for result in response.results])
+        return JsonResponse({"transcript": transcript})
+    return render(request, "speechtotext/transcribe_audio.html")
 
