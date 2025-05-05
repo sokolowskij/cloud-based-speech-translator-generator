@@ -76,6 +76,7 @@ if GS_BUCKET_NAME := env("MEDIAFILES_BUCKET_NAME", default=None):
 else:
     SECRET_KEY = local_secrets.SECRET_KEY
     MEDIA_URL = f"https://storage.googleapis.com/{local_secrets.GS_BUCKET_NAME}/"
+    GS_BUCKET_NAME = local_secrets.GS_BUCKET_NAME
 
     GS_CREDENTIALS = service_account.Credentials.from_service_account_file(
         os.path.join(BASE_DIR, local_secrets.BUCKET_CREDENTIALS_PATH)
