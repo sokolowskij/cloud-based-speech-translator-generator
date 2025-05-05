@@ -89,7 +89,7 @@ def submit_audio(request):
         audio = speech.RecognitionAudio(content=request.FILES['audio_file'].read())
         config = speech.RecognitionConfig(
             encoding=speech.RecognitionConfig.AudioEncoding.LINEAR16,
-            language_code="en-US"
+            language_code="pl-PL"
         )
         response = client.recognize(config=config, audio=audio)
 
