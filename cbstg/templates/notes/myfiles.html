@@ -1,0 +1,100 @@
+{% extends "index.html" %}
+{% block content %}
+    {% load crispy_forms_tags %}
+    {% load custom_tags %}
+
+    <div class="container pt-3">
+        <h2>Your Notes</h2>
+
+        <!-- Toggle Buttons -->
+        <div class="d-flex justify-content-center mb-3">
+            <button class="btn btn-outline-primary m-2" onclick="showFiles('audio')">Show Audio Files</button>
+            <button class="btn btn-outline-secondary m-2" onclick="showFiles('text')">Show Text Files</button>
+        </div>
+
+        <!-- Audio Files Section -->
+        <div id="audio-files" style="display:none;">
+            <h3>Audio Files</h3>
+            {% if audio_files %}
+                <table class="table">
+                    <tr>
+                        <th>No.</th>
+                        <th>Creation Date</th>
+                        <th>Filename</th>
+                    </tr>
+                    {% for file in audio_files %}
+                        <tr>
+                            <td>{{ forloop.counter }}</td>
+                            <td>{{ file.creation_date }}</td>
+                            <td>{{ file.file.name|basename }}</td>
+                            <td><a href="{% url 'download_submitted' file.pk %}" class="btn btn-outline-primary">Download</a>
+                            </td>
+                            <td><a href="{% url 'transcribe_audio' file.pk %}" class="btn btn-outline-primary">Transcribe</a>
+                            </td>
+                            <td>
+                                <form method="POST" action="{% url 'delete_file' file.pk %}" style="display:inline;">
+                                    {% csrf_token %}
+                                    <button type="submit" class="btn btn-outline-danger btn-sm"
+                                            onclick="return confirm('Are you sure you want to delete this file?');">
+                                        Delete
+                                    </button>
+                                </form>
+                            </td>
+                        </tr>
+                    {% endfor %}
+                </table>
+            {% else %}
+                <p>No audio files uploaded yet.</p>
+            {% endif %}
+        </div>
+
+        <!-- Text Files Section -->
+        <div id="text-files">
+            <h3>Text Files</h3>
+            {% if text_files %}
+                <table class="table">
+                    <tr>
+                        <th>No.</th>
+                        <th>Creation Date</th>
+                        <th>Filename</th>
+                    </tr>
+                    {% for file in text_files %}
+                        <tr>
+                            <td>{{ forloop.counter }}</td>
+                            <td>{{ file.creation_date }}</td>
+                            <td>{{ file.file.name|basename }}</td>
+                            <td><a href="{% url 'download_submitted' file.pk %}" class="btn btn-outline-primary">Download</a>
+                            </td>
+                            <td><a href="{% url 'synthesize_speech' file.pk %}" class="btn btn-outline-primary">Synthesize</a>
+                            </td>
+                            <td>
+                                <form method="POST" action="{% url 'delete_file' file.pk %}" style="display:inline;">
+                                    {% csrf_token %}
+                                    <button type="submit" class="btn btn-outline-danger btn-sm"
+                                            onclick="return confirm('Are you sure you want to delete this file?');">
+                                        Delete
+                                    </button>
+                                </form>
+                            </td>
+                        </tr>
+                    {% endfor %}
+                </table>
+            {% else %}
+                <p>No text files uploaded yet.</p>
+            {% endif %}
+        </div>
+
+        <div class="d-flex justify-content-center mt-3">
+            <a role="button" href="{% url 'save_file' %}" class="btn btn-outline-primary">Submit New File</a>
+        </div>
+    </div>
+
+    <!-- JavaScript to Toggle Sections -->
+    <script>
+        function showFiles(type) {
+            document.getElementById("audio-files").style.display = (type === "audio") ? "block" : "none";
+            document.getElementById("text-files").style.display = (type === "text") ? "block" : "none";
+        }
+    </script>
+
+{% endblock %}

@@ -1,11 +1,15 @@
 from django.urls import path
 
-from .views import mytexts_view, submit_text, download_submitted_text, submit_audio
+from .views import myfiles_view, submit_file, download_submitted, transcribe_audio, delete_file, synthesize_speech, \
+    save_synthesized_audio
 
 urlpatterns = [
-    path("text_to_speech/", mytexts_view, name='text_to_speech'),
-    path("text_to_speech/submit_text", submit_text, name='create_new_speech_from_text'),
-    path('text_to_speech/download_submitted/<int:text_id>/', download_submitted_text, name='download_submitted_text'),
-    path("speech_to_text/", mytexts_view, name='speech_to_text'),
-    path("speech_to_text/submit_audio", submit_audio, name='create_new_text_from_speech')
+    path("notes/", myfiles_view, name='notes_view'),
+    path("notes/submit_file", submit_file, name='save_file'),
+    path('notes/download_submitted/<int:file_id>/', download_submitted, name='download_submitted'),
+    path('notes/transcribe_audio/<int:file_id>/', transcribe_audio, name='transcribe_audio'),
+    path('notes/delete_file/<int:file_id>/', delete_file, name='delete_file'),
+    path('notes/synthesize_speech/<int:file_id>/', synthesize_speech, name='synthesize_speech'),
+    path('notes/save_synthesized_audio/', save_synthesized_audio, name='save_synthesized_audio'),
+
 ]

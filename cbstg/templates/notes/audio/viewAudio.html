@@ -1,0 +1,21 @@
+{% extends "index.html" %}
+{% block content %}
+<div class="container pt-3">
+    <h2>Speech Synthesis Result</h2>
+
+    <audio controls>
+        <source src="data:audio/mp3;base64,{{ audio_data }}" type="audio/mp3">
+        Your browser does not support the audio element.
+    </audio>
+
+    <form method="POST" action="{% url 'save_synthesized_audio' %}">
+        {% csrf_token %}
+        <input type="hidden" name="file_id" value="{{ file_id }}">
+        <input type="hidden" name="audio_data" value="{{ audio_data }}">
+        <div class="input-group mt-3">
+            <input type="text" name="filename" class="form-control" placeholder="Enter name for audio file" required>
+            <button type="submit" class="btn btn-outline-success">Save</button>
+        </div>
+    </form>
+</div>
+{% endblock %}
