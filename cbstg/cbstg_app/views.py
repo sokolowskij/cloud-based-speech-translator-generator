@@ -78,7 +78,7 @@ def myfiles_view(request):
 
     try:
         # Get all submitted files for the user
-        files = SubmittedFile.objects.filter(user=user)
+        files = SubmittedFile.objects.filter(user=user).order_by("-creation_date")
 
         # Define audio extensions
         audio_extensions = [".wav", ".mp3", ".m4a", ".aac", ".ogg", ".flac", ".webm"]
