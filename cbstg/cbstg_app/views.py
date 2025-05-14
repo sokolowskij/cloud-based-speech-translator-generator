@@ -13,6 +13,7 @@ from django.shortcuts import render, redirect
 from django.utils import timezone
 from django.views.decorators.http import require_POST
 from google.cloud import storage, speech, texttospeech
+from google.cloud import translate_v2 as translate
 from pydub import AudioSegment
 
 from .forms import SubmittedFileForm
@@ -117,10 +118,13 @@ def delete_file(request, file_id):
 @login_required(login_url="/login")
 def transcribe_audio(request, file_id):
     transcript = None
-    error = None
+    err1 = None
+    err2 = None
     if request.method == 'GET':
         try:
             submitted_file = SubmittedFile.objects.get(id=file_id, user=request.user)
+            input_lang = request.GET.get("input_lang", "en")
+            target_lang = request.GET.get("target_lang", "en")
             print("Submitted text")
         except SubmittedFile.DoesNotExist:
             raise Http404("File not found.")
@@ -142,20 +146,23 @@ def transcribe_audio(request, file_id):
             recognition_audio = speech.RecognitionAudio(content=wav_data.read())
             config = speech.RecognitionConfig(
                 encoding=speech.RecognitionConfig.AudioEncoding.LINEAR16,
-                language_code="en-US",
+                language_code=input_lang,
                 sample_rate_hertz=16000,  # Standardized sample rate
                 enable_automatic_punctuation=True,
             )
 
             response = client.recognize(config=config, audio=recognition_audio)
             transcript = " ".join([result.alternatives[0].transcript for result in response.results])
+
+            if target_lang != input_lang:
+                transcript, err1 = translate_text(transcript, target_lang)
         except Exception as e:
             print("Transcription failed:", e)
-            error = str(e)
+            err2 = "Transcription failed: " + str(e)
 
         return render(request, "notes/text/viewText.html", {
             "transcript": transcript,
-            "error": error,
+            "error": err1 or err2 if (err1 and err2) is None else err1 + "\n" + err2,
         })
     elif request.method == 'POST':
         filename = request.POST.get('filename', 'transcription.txt')
@@ -175,10 +182,10 @@ def transcribe_audio(request, file_id):
             new_file.save()
             return redirect('notes_view')
         except Exception as e:
-            error = f"Failed to save transcription: {e}"
+            err2 = f"Failed to save transcription: {e}"
         return render(request, "notes/text/viewText.html", {
             "transcript": transcript,
-            "error": error,
+            "error": err2,
         })
 
     return redirect('notes_view')
@@ -186,8 +193,11 @@ def transcribe_audio(request, file_id):
 
 @login_required
 def synthesize_speech(request, file_id):
+    err1 = None
     try:
         text_file = SubmittedFile.objects.get(id=file_id, user=request.user)
+        input_lang = request.GET.get("input_lang", "en")
+        target_lang = request.GET.get("target_lang", "en")
 
         with default_storage.open(text_file.file.name, "r") as f:
             text = f.read()
@@ -195,13 +205,18 @@ def synthesize_speech(request, file_id):
         if not text:
             raise ValueError("File is empty.")
 
+        if target_lang != input_lang:
+            text, err1 = translate_text(text, target_lang)
+            text = text.encode("utf-8")
+            print(err1)
+
         # Initialize the TTS client
         client = texttospeech.TextToSpeechClient()
 
         synthesis_input = texttospeech.SynthesisInput(text=text)
 
         voice = texttospeech.VoiceSelectionParams(
-            language_code="en-US",
+            language_code=target_lang,
             ssml_gender=texttospeech.SsmlVoiceGender.NEUTRAL,
         )
 
@@ -226,7 +241,8 @@ def synthesize_speech(request, file_id):
         return render(request, "notes/audio/viewAudio.html", {
             "audio_data": audio_base64,
             "file_id": file_id,
-            "text": text
+            "text": text,
+            "error": err1,
         })
     except (SubmittedFile.DoesNotExist, ValueError) as e:
         print(e)
@@ -251,3 +267,15 @@ def save_synthesized_audio(request):
         return HttpResponse(f"Failed to save audio: {e}", status=500)
 
     return redirect("notes_view")
+
+
+def translate_text(text, target_language='en'):
+    try:
+        if isinstance(text, bytes):
+            text = text.decode("utf-8")
+        client = translate.Client()
+        result = client.translate(text, target_language=target_language)
+        return result["translatedText"], None
+    except Exception as e:
+        print(f"Translation failed: {e}")
+        return text, "Translation failed: " + str(e) + "\n"

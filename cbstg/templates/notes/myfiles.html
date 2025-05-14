@@ -21,15 +21,33 @@
                         <th>No.</th>
                         <th>Creation Date</th>
                         <th>Filename</th>
+                        <th>Input/Output Language</th>
                     </tr>
                     {% for file in audio_files %}
                         <tr>
                             <td>{{ forloop.counter }}</td>
                             <td>{{ file.creation_date }}</td>
                             <td>{{ file.file.name|basename }}</td>
-                            <td><a href="{% url 'download_submitted' file.pk %}" class="btn btn-outline-primary">Download</a>
+                            <td>
+                                <form method="GET" action="{% url 'transcribe_audio' file.pk %}">
+                                    <select name="input_lang" class="form-select form-select-sm d-inline w-auto">
+                                        <option value="en">English</option>
+                                        <option value="es">Spanish</option>
+                                        <option value="fr">French</option>
+                                        <option value="de">German</option>
+                                        <option value="pl">Polish</option>
+                                    </select>
+                                    <select name="target_lang" class="form-select form-select-sm d-inline w-auto">
+                                        <option value="en">English</option>
+                                        <option value="es">Spanish</option>
+                                        <option value="fr">French</option>
+                                        <option value="de">German</option>
+                                        <option value="pl">Polish</option>
+                                    </select>
+                                    <button type="submit" class="btn btn-outline-primary btn-sm">Transcribe</button>
+                                </form>
                             </td>
-                            <td><a href="{% url 'transcribe_audio' file.pk %}" class="btn btn-outline-primary">Transcribe</a>
+                            <td><a href="{% url 'download_submitted' file.pk %}" class="btn btn-outline-primary">Download</a>
                             </td>
                             <td>
                                 <form method="POST" action="{% url 'delete_file' file.pk %}" style="display:inline;">
@@ -57,15 +75,33 @@
                         <th>No.</th>
                         <th>Creation Date</th>
                         <th>Filename</th>
+                        <th>Input/Output Language</th>
                     </tr>
                     {% for file in text_files %}
                         <tr>
                             <td>{{ forloop.counter }}</td>
                             <td>{{ file.creation_date }}</td>
                             <td>{{ file.file.name|basename }}</td>
-                            <td><a href="{% url 'download_submitted' file.pk %}" class="btn btn-outline-primary">Download</a>
+                            <td>
+                                <form method="GET" action="{% url 'synthesize_speech' file.pk %}">
+                                    <select name="input_lang" class="form-select form-select-sm d-inline w-auto">
+                                        <option value="en">English</option>
+                                        <option value="es">Spanish</option>
+                                        <option value="fr">French</option>
+                                        <option value="de">German</option>
+                                        <option value="pl">Polish</option>
+                                    </select>
+                                    <select name="target_lang" class="form-select form-select-sm d-inline w-auto">
+                                        <option value="en">English</option>
+                                        <option value="es">Spanish</option>
+                                        <option value="fr">French</option>
+                                        <option value="de">German</option>
+                                        <option value="pl">Polish</option>
+                                    </select>
+                                    <button type="submit" class="btn btn-outline-primary btn-sm">Synthesize</button>
+                                </form>
                             </td>
-                            <td><a href="{% url 'synthesize_speech' file.pk %}" class="btn btn-outline-primary">Synthesize</a>
+                            <td><a href="{% url 'download_submitted' file.pk %}" class="btn btn-outline-primary">Download</a>
                             </td>
                             <td>
                                 <form method="POST" action="{% url 'delete_file' file.pk %}" style="display:inline;">
