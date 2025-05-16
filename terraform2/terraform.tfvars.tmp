@@ -1,0 +1,5 @@
+# create file terraform.tfvars with these set to appropriate values
+
+project_id   =
+db_password  =
+service_name =

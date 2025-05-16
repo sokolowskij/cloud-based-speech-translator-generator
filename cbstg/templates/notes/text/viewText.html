@@ -1,0 +1,39 @@
+{% extends "index.html" %}
+
+{% block content %}
+    <div class="container pt-3">
+        <h2>Transcription Result</h2>
+        {% if error %}
+            <div class="alert alert-danger">{{ error }}</div>
+        {% endif %}
+
+        {% if transcript %}
+            <div class="card mb-3">
+                <div class="card-body">
+                    <h5 class="card-title">Transcribed Text</h5>
+                    <p class="card-text">{{ transcript }}</p>
+                </div>
+            </div>
+
+            <!-- Input field for naming the transcription -->
+            <form method="POST" class="mb-3">
+                {% csrf_token %}
+                <div class="input-group">
+                    <input type="hidden" name="transcript" value="{{ transcript }}">
+                    <input type="text" name="filename" class="form-control"
+                           placeholder="Enter a name for your transcription">
+                    <button type="submit" class="btn btn-outline-success">Save</button>
+                </div>
+            </form>
+
+            <!-- Buttons for additional actions -->
+            <div class="d-flex justify-content-center">
+                <a href="{% url 'notes_view' %}" class="btn btn-outline-secondary m-2">Back to Notes</a>
+            </div>
+        {% else %}
+            {% if not error %}
+                <p>No transcription available.</p>
+            {% endif %}
+        {% endif %}
+    </div>
+{% endblock %}

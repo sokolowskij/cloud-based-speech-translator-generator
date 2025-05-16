@@ -184,3 +184,11 @@ cython_debug/
 /terraform/terraform.tfstate.backup
 /terraform/.terraform.lock.hcl
 
+
+/terraform2/.terraform
+/terraform2/terraform.tfvars
+/terraform2/terraform.tfstate
+/terraform2/terraform.tfstate.backup
+/terraform2/.terraform.lock.hcl
+
+

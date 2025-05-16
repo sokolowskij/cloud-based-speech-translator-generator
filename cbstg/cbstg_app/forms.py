@@ -1,10 +1,10 @@
 from django import forms
-from .models import SubmittedText, TranslatedText
+from .models import SubmittedFile, TranslatedText
 
 
-class SubmittedTextForm(forms.ModelForm):
+class SubmittedFileForm(forms.ModelForm):
     class Meta:
-        model = SubmittedText
+        model = SubmittedFile
         fields = ['file']
         widgets = {
             'file': forms.ClearableFileInput(attrs={'class': 'form-control'}),
