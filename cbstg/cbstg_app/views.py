@@ -14,7 +14,9 @@ from django.utils import timezone
 from django.views.decorators.http import require_POST
 from google.cloud import storage, speech, texttospeech
 from google.cloud import translate_v2 as translate
-from pydub import AudioSegment
+import soundfile as sf
+import numpy as np
+from scipy.signal import resample
 
 from .forms import SubmittedFileForm
 from .models import SubmittedFile
@@ -133,14 +135,23 @@ def transcribe_audio(request, file_id):
             with default_storage.open(submitted_file.file.name, "rb") as audio_file:
                 audio_data = io.BytesIO(audio_file.read())
 
-            # Convert stereo to mono
-            audio = AudioSegment.from_file(audio_data)
-            audio = audio.set_channels(1)  # Convert to mono
-            audio = audio.set_frame_rate(16000)  # Standardize sample rate
+            # Read the audio file
+            audio_data, sample_rate = sf.read(audio_data)  # or .flac, .ogg, etc.
+
+            # If stereo, convert to mono by averaging channels
+            if len(audio_data.shape) > 1 and audio_data.shape[1] > 1:
+                audio_data = np.mean(audio_data, axis=1)
+
+            # Resample to 16000 Hz if needed
+            target_rate = 16000
+            if sample_rate != target_rate:
+                num_samples = int(len(audio_data) * target_rate / sample_rate)
+                audio_data = resample(audio_data, num_samples)
+                sample_rate = target_rate
 
             # Save converted audio to memory
             wav_data = io.BytesIO()
-            audio.export(wav_data, format="wav")
+            sf.write(wav_data, audio_data, sample_rate, format='WAV')
             wav_data.seek(0)
 
             recognition_audio = speech.RecognitionAudio(content=wav_data.read())
