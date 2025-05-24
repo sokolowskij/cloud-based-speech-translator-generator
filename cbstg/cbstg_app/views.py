@@ -20,12 +20,15 @@ from scipy.signal import resample
 
 from .forms import SubmittedFileForm
 from .models import SubmittedFile
+import logging
+
+logger = logging.getLogger('cbstg')  # Use your app's logger
 
 
 @login_required
 def submit_file(request):
     if request.method == 'POST':
-        print("Post called")
+        logger.info("File submittion")
         form = SubmittedFileForm(request.POST, request.FILES)
         if form.is_valid():
             print("Form is valid")
@@ -45,8 +48,8 @@ def submit_file(request):
 def download_submitted(request, file_id):
     try:
         submitted_text = SubmittedFile.objects.get(id=file_id, user=request.user)
-        print("Submitted text")
-    except SubmittedFile.DoesNotExist:
+    except SubmittedFile.DoesNotExist as e:
+        logger.error(f"Error in download_submitted: {e}")
         raise Http404("File not found.")
     try:
         file_path = submitted_text.file.name
@@ -68,8 +71,9 @@ def download_submitted(request, file_id):
             method="GET",
             response_disposition=f'attachment; filename="{filename}"',
         )
+        logger.info("Generated download url")
     except Exception as e:
-        print(e)
+        logger.error(f"Error in download_submitted: {e}")
 
     return HttpResponseRedirect(url)
 
@@ -95,8 +99,10 @@ def myfiles_view(request):
         text_files = files.exclude(audio_query)
 
     except ObjectDoesNotExist:
+        logger.info("No file objects present")
         audio_files = None
         text_files = None
+    logger.info("Rendering myfiles view")
 
     return render(
         request,
@@ -112,8 +118,10 @@ def delete_file(request, file_id):
         file = SubmittedFile.objects.get(id=file_id, user=request.user)
         file.file.delete()  # Deletes the file from storage
         file.delete()  # Deletes the database record
+        logger.info(f"Deleted file {file_id}")
+
     except SubmittedFile.DoesNotExist:
-        print("File not found.")
+        logger.info(f"File {file_id} to be deleted not found")
     return redirect('notes_view')
 
 
@@ -127,11 +135,13 @@ def transcribe_audio(request, file_id):
             submitted_file = SubmittedFile.objects.get(id=file_id, user=request.user)
             input_lang = request.GET.get("input_lang", "en")
             target_lang = request.GET.get("target_lang", "en")
-            print("Submitted text")
+            logger.info(f"File submitted for transcription")
+
         except SubmittedFile.DoesNotExist:
             raise Http404("File not found.")
         try:
             client = speech.SpeechClient()
+            logger.info(f"Connecting to SpeechClient")
             with default_storage.open(submitted_file.file.name, "rb") as audio_file:
                 audio_data = io.BytesIO(audio_file.read())
 
@@ -163,13 +173,14 @@ def transcribe_audio(request, file_id):
             )
 
             response = client.recognize(config=config, audio=recognition_audio)
+            logger.info(f"Getting response from SpeechClient")
             transcript = " ".join([result.alternatives[0].transcript for result in response.results])
 
             if target_lang != input_lang:
                 transcript, err1 = translate_text(transcript, target_lang)
         except Exception as e:
-            print("Transcription failed:", e)
             err2 = "Transcription failed: " + str(e)
+            logger.error(err2)
 
         return render(request, "notes/text/viewText.html", {
             "transcript": transcript,
@@ -194,6 +205,8 @@ def transcribe_audio(request, file_id):
             return redirect('notes_view')
         except Exception as e:
             err2 = f"Failed to save transcription: {e}"
+            logger.error(err2)
+
         return render(request, "notes/text/viewText.html", {
             "transcript": transcript,
             "error": err2,
@@ -219,9 +232,10 @@ def synthesize_speech(request, file_id):
         if target_lang != input_lang:
             text, err1 = translate_text(text, target_lang)
             text = text.encode("utf-8")
-            print(err1)
+            logger.info(f"Error while translating text: {err1}")
 
         # Initialize the TTS client
+        logger.info(f"Connecting to TextToSpeechClient")
         client = texttospeech.TextToSpeechClient()
 
         synthesis_input = texttospeech.SynthesisInput(text=text)
@@ -235,6 +249,7 @@ def synthesize_speech(request, file_id):
             audio_encoding=texttospeech.AudioEncoding.MP3
         )
 
+        logger.info(f"Getting response from TextToSpeechClient")
         response = client.synthesize_speech(
             input=synthesis_input, voice=voice, audio_config=audio_config
         )
@@ -256,7 +271,7 @@ def synthesize_speech(request, file_id):
             "error": err1,
         })
     except (SubmittedFile.DoesNotExist, ValueError) as e:
-        print(e)
+        logger.error(f"Error in synthesize_speech {e}")
         raise Http404("Text file not found or invalid.")
 
 
@@ -275,6 +290,7 @@ def save_synthesized_audio(request):
         path = default_storage.save(f"submitted/{filename}.mp3", ContentFile(decoded_audio))
         SubmittedFile.objects.create(user=request.user, file=path, creation_date=timezone.now())
     except Exception as e:
+        logger.error(f"Failed to save audio: {e}")
         return HttpResponse(f"Failed to save audio: {e}", status=500)
 
     return redirect("notes_view")
@@ -284,9 +300,10 @@ def translate_text(text, target_language='en'):
     try:
         if isinstance(text, bytes):
             text = text.decode("utf-8")
+        logger.info(f"Connecting to translate Client")
         client = translate.Client()
         result = client.translate(text, target_language=target_language)
         return result["translatedText"], None
     except Exception as e:
-        print(f"Translation failed: {e}")
+        logger.error(f"Translation failed: {e}")
         return text, "Translation failed: " + str(e) + "\n"
