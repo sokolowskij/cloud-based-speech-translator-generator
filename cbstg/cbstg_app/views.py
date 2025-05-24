@@ -1,6 +1,8 @@
 import base64
 import io
 from datetime import timedelta
+import os
+import fitz
 
 from django.conf import settings
 from django.contrib.auth.decorators import login_required
@@ -14,32 +16,121 @@ from django.utils import timezone
 from django.views.decorators.http import require_POST
 from google.cloud import storage, speech, texttospeech
 from google.cloud import translate_v2 as translate
-import soundfile as sf
-import numpy as np
-from scipy.signal import resample
+from pydub import AudioSegment
+from pydub.exceptions import CouldntDecodeError
+from django.core.cache import cache
+from .models import Role
 
 from .forms import SubmittedFileForm
 from .models import SubmittedFile
+from .limits import check_and_increment_limit, initialize_limit_if_needed, is_within_file_limit
 
+# @login_required
+# def submit_file(request):
+#     if request.method == 'POST':
+#         print("Post called")
+#         form = SubmittedFileForm(request.POST, request.FILES)
+#         if form.is_valid():
+#             print("Form is valid")
+#             submitted_text = form.save(commit=False)
+#             submitted_text.user = request.user
+#             try:
+#                 submitted_text.save()
+#             except Exception as e:
+#                 print(e)
+#             return redirect('notes_view')
+#     else:
+#         form = SubmittedFileForm()
+#     return render(request, 'notes/submit_file.html', {'form': form})
 
 @login_required
 def submit_file(request):
     if request.method == 'POST':
-        print("Post called")
         form = SubmittedFileForm(request.POST, request.FILES)
         if form.is_valid():
-            print("Form is valid")
-            submitted_text = form.save(commit=False)
-            submitted_text.user = request.user
+            submitted_file = form.save(commit=False)
+            submitted_file.user = request.user
+            uploaded_file = request.FILES.get("file")
+
+            filename = uploaded_file.name
+            ext = os.path.splitext(filename)[-1].lower()
+
             try:
-                submitted_text.save()
+                if ext in ['.txt', '.pdf']:
+                    # --- LIMIT CHARACTERS ---
+                    text = extract_text_from_file(uploaded_file, filename)
+                    char_count = len(text)
+
+                    if not is_within_file_limit(request.user, "char", char_count):
+                        return render(request, 'notes/submit_file.html', {
+                            'form': form,
+                            'error': f"Character limit exceeded."
+                        })
+
+                elif ext in ['.mp3', '.wav']:
+                    # --- LIMIT AUDIO DURATION ---
+                    audio = AudioSegment.from_file(uploaded_file)
+                    duration_seconds = len(audio) // 1000
+
+                    if not is_within_file_limit(request.user, "audio_duration", duration_seconds):
+                        return render(request, 'notes/submit_file.html', {
+                            'form': form,
+                            'error': f"Audio duration limit exceeded."
+                        })
+
+                # --- ZAPIS ---
+                submitted_file.save()
+                return redirect('notes_view')
+
             except Exception as e:
                 print(e)
-            return redirect('notes_view')
+                return render(request, 'notes/submit_file.html', {
+                    'form': form,
+                    'error': f"File processing failed: {e}"
+                })
+
     else:
         form = SubmittedFileForm()
     return render(request, 'notes/submit_file.html', {'form': form})
 
+
+# @login_required
+# def download_submitted(request, file_id):
+#     try:
+#         submitted_text = SubmittedFile.objects.get(id=file_id, user=request.user)
+#         print("Submitted text")
+#     except SubmittedFile.DoesNotExist:
+#         raise Http404("File not found.")
+#     try:
+#         file_path = submitted_text.file.name
+#         filename = submitted_text.file.name.split("/")[-1]
+
+#         # Initialize GCS client
+#         if settings.SERVICE_NAME is None:  # local development
+#             storage_client = storage.Client(credentials=settings.GS_CREDENTIALS)
+#         else:
+#             storage_client = storage.Client()
+
+#         bucket = storage_client.bucket(settings.GS_BUCKET_NAME)
+#         blob = bucket.blob(file_path)
+
+#         # Generate signed URL with download header
+#         url = blob.generate_signed_url(
+#             version="v4",
+#             expiration=timedelta(minutes=10),
+#             method="GET",
+#             response_disposition=f'attachment; filename="{filename}"',
+#         )
+#     except Exception as e:
+#         print(e)
+
+#     return HttpResponseRedirect(url)
+
+from django.http import HttpResponseRedirect, Http404
+from google.cloud import storage
+from datetime import timedelta
+from django.conf import settings
+from django.contrib.auth.decorators import login_required
 
 @login_required
 def download_submitted(request, file_id):
@@ -48,6 +139,7 @@ def download_submitted(request, file_id):
         print("Submitted text")
     except SubmittedFile.DoesNotExist:
         raise Http404("File not found.")
+
     try:
         file_path = submitted_text.file.name
         filename = submitted_text.file.name.split("/")[-1]
@@ -68,10 +160,13 @@ def download_submitted(request, file_id):
             method="GET",
             response_disposition=f'attachment; filename="{filename}"',
         )
-    except Exception as e:
-        print(e)
 
-    return HttpResponseRedirect(url)
+        return HttpResponseRedirect(url)  # ⬅ tylko jeśli się uda
+
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        raise Http404(f"Problem during file download: {e}")
 
 
 @login_required(login_url="/login")
@@ -128,30 +223,31 @@ def transcribe_audio(request, file_id):
             input_lang = request.GET.get("input_lang", "en")
             target_lang = request.GET.get("target_lang", "en")
             print("Submitted text")
+
+            # --- LIMIT CHECK ---
+            initialize_limit_if_needed(request.user, "daily_stt")
+            if not check_and_increment_limit(request.user, "daily_stt"):
+                return render(request, "notes/text/viewText.html", {
+                    "transcript": None,
+                    "error": "Daily STT limit exceeded."
+                })
+            
         except SubmittedFile.DoesNotExist:
             raise Http404("File not found.")
+
         try:
             client = speech.SpeechClient()
             with default_storage.open(submitted_file.file.name, "rb") as audio_file:
                 audio_data = io.BytesIO(audio_file.read())
 
-            # Read the audio file
-            audio_data, sample_rate = sf.read(audio_data)  # or .flac, .ogg, etc.
-
-            # If stereo, convert to mono by averaging channels
-            if len(audio_data.shape) > 1 and audio_data.shape[1] > 1:
-                audio_data = np.mean(audio_data, axis=1)
-
-            # Resample to 16000 Hz if needed
-            target_rate = 16000
-            if sample_rate != target_rate:
-                num_samples = int(len(audio_data) * target_rate / sample_rate)
-                audio_data = resample(audio_data, num_samples)
-                sample_rate = target_rate
+            # Convert stereo to mono
+            audio = AudioSegment.from_file(audio_data)
+            audio = audio.set_channels(1)  # Convert to mono
+            audio = audio.set_frame_rate(16000)  # Standardize sample rate
 
             # Save converted audio to memory
             wav_data = io.BytesIO()
-            sf.write(wav_data, audio_data, sample_rate, format='WAV')
+            audio.export(wav_data, format="wav")
             wav_data.seek(0)
 
             recognition_audio = speech.RecognitionAudio(content=wav_data.read())
@@ -167,6 +263,7 @@ def transcribe_audio(request, file_id):
 
             if target_lang != input_lang:
                 transcript, err1 = translate_text(transcript, target_lang)
+
         except Exception as e:
             print("Transcription failed:", e)
             err2 = "Transcription failed: " + str(e)
@@ -202,6 +299,24 @@ def transcribe_audio(request, file_id):
     return redirect('notes_view')
 
 
+def extract_text_from_file(file_obj, filename=None):
+    ext = os.path.splitext(filename)[-1].lower() if filename else ''
+
+    if ext == ".txt":
+        return file_obj.read().decode("utf-8")
+
+    elif ext == ".pdf":
+        file_bytes = file_obj.read()
+        doc = fitz.open(stream=file_bytes, filetype="pdf")
+        text = ""
+        for page in doc:
+            text += page.get_text()
+        return text
+
+    else:
+        raise ValueError("Unsupported file type. Only .txt and .pdf are supported.")
+
+
 @login_required
 def synthesize_speech(request, file_id):
     err1 = None
@@ -210,10 +325,21 @@ def synthesize_speech(request, file_id):
         input_lang = request.GET.get("input_lang", "en")
         target_lang = request.GET.get("target_lang", "en")
 
-        with default_storage.open(text_file.file.name, "r") as f:
-            text = f.read()
+        # --- LIMIT CHECK ---
+        initialize_limit_if_needed(request.user, "daily_tts")
+        if not check_and_increment_limit(request.user, "daily_tts"):
+            return render(request, "notes/audio/viewAudio.html", {
+                "audio_data": None,
+                "file_id": file_id,
+                "text": "",
+                "error": "Daily TTS limit exceeded."
+            })
 
-        if not text:
+        with default_storage.open(text_file.file.name, "rb") as f:
+            text = extract_text_from_file(f, text_file.file.name)
+
+
+        if not text.strip():
             raise ValueError("File is empty.")
 
         if target_lang != input_lang:
@@ -290,3 +416,33 @@ def translate_text(text, target_language='en'):
     except Exception as e:
         print(f"Translation failed: {e}")
         return text, "Translation failed: " + str(e) + "\n"
+
+@login_required
+def change_role(request):
+    user = request.user
+
+    if user.is_superuser:
+        return render(request, 'account/change_role.html', {
+            'error': 'Superuser cannot change role manually.'
+        })
+
+    available_roles = Role.objects.filter(role_name__in=['Free', 'Premium', 'Enterprise'])
+
+    if request.method == 'POST':
+        new_role_id = request.POST.get('role')
+        try:
+            new_role = Role.objects.get(role_id=new_role_id)
+            user.role = new_role
+            user.save(update_fields=['role'])
+            return redirect('index')
+        except Role.DoesNotExist:
+            return render(request, 'account/change_role.html', {
+                'error': 'Wybrana rola nie istnieje.',
+                'roles': available_roles,
+                'current_role': user.role
+            })
+
+    return render(request, 'account/change_role.html', {
+        'roles': available_roles,
+        'current_role': user.role
+    })

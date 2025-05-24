@@ -4,21 +4,26 @@
 
 {% block content %}
     <div class="container pt-3">
+
+        {% if error %}
+          <div class="alert alert-danger" role="alert">
+            {{ error }}
+          </div>
+        {% endif %}
+
         {% if edit %}
         <h2>Edit selected note</h2>
         {% else %}
         <h2>Create new note</h2>
         {% endif %}
+        
         <form method="POST" enctype="multipart/form-data" class="pt-2">
-                {% csrf_token %}
-                {{ form.file }}
-                <div class="d-flex justify-content-center">
-                    <button type="submit" class="btn btn-outline-primary m-2">Save</button>
-                    <a role="button" href="{% url 'notes_view' %}" class="btn btn-outline-danger m-2">Cancel</a>
-                </div>
-            </form>
+            {% csrf_token %}
+            {{ form.file }}
+            <div class="d-flex justify-content-center">
+                <button type="submit" class="btn btn-outline-primary m-2">Save</button>
+                <a role="button" href="{% url 'notes_view' %}" class="btn btn-outline-danger m-2">Cancel</a>
+            </div>
+        </form>
     </div>
-
 {% endblock %}
-
-
