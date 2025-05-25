@@ -49,6 +49,7 @@ def submit_file(request):
                     char_count = len(text)
 
                     if not is_within_file_limit(request.user, "char", char_count):
+                        logger.info(f"Character limit exceeded, character length: {char_count}")
                         return render(request, 'notes/submit_file.html', {
                             'form': form,
                             'error': f"Character limit exceeded."
@@ -56,10 +57,12 @@ def submit_file(request):
 
                 elif ext in ['.mp3', '.wav']:
                     # --- LIMIT AUDIO DURATION ---
-                    audio = AudioSegment.from_file(uploaded_file)
-                    duration_seconds = len(audio) // 1000
+                    audio_data, sample_rate = sf.read(uploaded_file)  # or .flac, .ogg, etc.
+                    duration_seconds = len(audio_data) // sample_rate
 
                     if not is_within_file_limit(request.user, "audio_duration", duration_seconds):
+                        logger.info(f"Audio duration limit exceeded, duration: {duration_seconds}")
+
                         return render(request, 'notes/submit_file.html', {
                             'form': form,
                             'error': f"Audio duration limit exceeded."
@@ -70,7 +73,7 @@ def submit_file(request):
                 return redirect('notes_view')
 
             except Exception as e:
-                print(e)
+                logger.error(f"Error in submit_file: {e}")
                 return render(request, 'notes/submit_file.html', {
                     'form': form,
                     'error': f"File processing failed: {e}"
@@ -279,6 +282,8 @@ def extract_text_from_file(file_obj, filename=None):
         return text
 
     else:
+        logger.error(
+            f"Value Error while extracting text from file: Unsupported file type. Only .txt and .pdf are supported.")
         raise ValueError("Unsupported file type. Only .txt and .pdf are supported.")
 
 
@@ -304,6 +309,7 @@ def synthesize_speech(request, file_id):
             text = extract_text_from_file(f, text_file.file.name)
 
         if not text.strip():
+            logger.error(f"Error: File is empty.")
             raise ValueError("File is empty.")
 
         if target_lang != input_lang:
