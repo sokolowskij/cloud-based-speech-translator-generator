@@ -10,13 +10,14 @@ from google.oauth2 import service_account
 from .basesettings import *
 import local_secrets
 
+AUTH_USER_MODEL = 'cbstg_app.CustomUser'
+
 env = environ.Env()
 if env("APPLICATION_SETTINGS", default=None):
     env.read_env(io.StringIO(os.environ.get("APPLICATION_SETTINGS", None)))
 else:
     env_file = BASE_DIR / ".env"
     env.read_env(env_file)
-
 
 SECRET_KEY = env("SECRET_KEY")
 DEBUG = env("DEBUG", default=False)

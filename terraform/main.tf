@@ -3,43 +3,23 @@ provider "google" {
   region  = var.region
 }
 
-resource "google_project_service" "required_services" {
-  for_each = toset([
-    "artifactregistry.googleapis.com",
-    "cloudbuild.googleapis.com",
-    "run.googleapis.com",
-    "secretmanager.googleapis.com",
-    "storage-component.googleapis.com",
-    "iam.googleapis.com",
-    "translate.googleapis.com",
-    "texttospeech.googleapis.com",
-    "speech.googleapis.com"
-  ])
-
-  service            = each.key
-  disable_on_destroy = false
-}
-
-
 # Create Cloud Storage Bucket for Media Files
 resource "google_storage_bucket" "media_files" {
-  name           = "${var.project_id}-media-files-new"
+  name           = "${var.project_id}-media-files"
   location       = var.region
   force_destroy  = true
-  depends_on = [google_project_service.required_services]
 }
 
 # Create Cloud Storage Bucket for Static files
 resource "google_storage_bucket" "staticfiles" {
-  name           = "${var.project_id}-staticfiles-new"
+  name           = "${var.project_id}-staticfiles"
   location       = var.region
   force_destroy  = true
-  depends_on = [google_project_service.required_services]
 }
 
 # Cloud SQL Instance
 resource "google_sql_database_instance" "postgres_instance" {
-  name             = "pg-instance-new"
+  name             = "pg-instance"
   database_version = "POSTGRES_17"
   region           = var.region
 
@@ -51,9 +31,8 @@ resource "google_sql_database_instance" "postgres_instance" {
 
 # Create service account
 resource "google_service_account" "django_sa" {
-  account_id   = "django-cloudrun-sa-new"
+  account_id   = "django-cloudrun-sa"
   display_name = "Django Cloud Run Service Account"
-  depends_on = [google_project_service.required_services]
 }
 
 # Create Artifact Repository to store the application image
@@ -61,8 +40,7 @@ resource "google_artifact_registry_repository" "main" {
   format        = "DOCKER"
   location      = var.region
   project       = var.project_id
-  repository_id = "django-app-new"
-  depends_on = [google_project_service.required_services]
+  repository_id = "django-app"
 }
 
 # Cloud SQL User & DB
@@ -70,13 +48,11 @@ resource "google_sql_user" "postgres_user" {
   name     = var.db_user
   instance = google_sql_database_instance.postgres_instance.name
   password = var.db_password
-  depends_on = [google_project_service.required_services]
 }
 
 resource "google_sql_database" "app_db" {
   name     = var.db_name
   instance = google_sql_database_instance.postgres_instance.name
-  depends_on = [google_project_service.required_services]
 }
 
 # Create local variables
@@ -89,34 +65,29 @@ locals {
 
 # Secret Manager: DB Password
 resource "google_secret_manager_secret" "db_password" {
-  secret_id = "django-db-password-new"
+  secret_id = "django-db-password"
   replication {
     auto {}
   }
-  depends_on = [google_project_service.required_services]
 }
 
 resource "google_secret_manager_secret_version" "db_password_version" {
   secret      = google_secret_manager_secret.db_password.id
   secret_data_wo = var.db_password
-  depends_on = [google_project_service.required_services]
 }
 
 # Create a random string to use as the Django secret key
 resource "random_password" "django_secret_key" {
   special = false
   length  = 50
-  depends_on = [google_project_service.required_services]
 }
 
 # Create application settings data with terraform template and save in secret
 resource "google_secret_manager_secret" "application_settings" {
-  secret_id = "application_settings_new"
+  secret_id = "application_settings"
   replication {
     auto {}
   }
-
-  depends_on = [google_project_service.required_services]
 }
 
 # Replace the Terraform template variables and save the rendered content as a secret
@@ -134,29 +105,25 @@ resource "google_secret_manager_secret_version" "application_settings" {
       db_instance_region   = google_sql_database_instance.postgres_instance.region
       db_name            = google_sql_database.app_db.name
   })
-  depends_on = [google_project_service.required_services]
 }
 
 # Generate a random password for the superuser
 resource "random_password" "superuser_password" {
   length  = 32
   special = false
-  depends_on = [google_project_service.required_services]
 }
 
 # Save the superuser password as a secret
 resource "google_secret_manager_secret" "superuser_password" {
-  secret_id = "superuser_password-new"
+  secret_id = "superuser_password"
   replication {
     auto {}
   }
-  depends_on = [google_project_service.required_services]
 }
 
 resource "google_secret_manager_secret_version" "superuser_password" {
   secret      = google_secret_manager_secret.superuser_password.id
   secret_data = random_password.superuser_password.result
-  depends_on = [google_project_service.required_services]
 }
 
 # Create google credential json file and store in secrets
@@ -166,7 +133,6 @@ resource "google_service_account_key" "django_key" {
     last_rotation = timestamp()
   }
   private_key_type = "TYPE_GOOGLE_CREDENTIALS_FILE"
-  depends_on = [google_project_service.required_services]
 }
 
 resource "google_secret_manager_secret" "django_key" {
@@ -174,13 +140,11 @@ resource "google_secret_manager_secret" "django_key" {
   replication {
     auto {}
   }
-  depends_on = [google_project_service.required_services]
 }
 
 resource "google_secret_manager_secret_version" "django_key" {
   secret      = google_secret_manager_secret.django_key.id
   secret_data_wo = base64decode(google_service_account_key.django_key.private_key)
-  depends_on = [google_project_service.required_services]
 }
 
 # Grant all permissions
@@ -191,7 +155,6 @@ resource "google_secret_manager_secret_iam_binding" "cloudrun_secret_access" {
   secret_id = google_secret_manager_secret.db_password.id
   role      = "roles/secretmanager.secretAccessor"
   members    = [local.service_account]
-  depends_on = [google_project_service.required_services]
 }
 
 # Grant the Cloud Run service account access to the application settings secret
@@ -199,7 +162,6 @@ resource "google_secret_manager_secret_iam_binding" "application_settings" {
   secret_id = google_secret_manager_secret.application_settings.id
   role      = "roles/secretmanager.secretAccessor"
   members   = [local.service_account]
-  depends_on = [google_project_service.required_services]
 }
 
 # Grant the Cloud Run service account access to the superuser password secret
@@ -207,7 +169,6 @@ resource "google_secret_manager_secret_iam_binding" "superuser_password" {
   secret_id = google_secret_manager_secret.superuser_password.id
   role      = "roles/secretmanager.secretAccessor"
   members   = [local.service_account]
-  depends_on = [google_project_service.required_services]
 }
 
 # Grant the Cloud Run service account access to the superuser password secret
@@ -215,7 +176,6 @@ resource "google_secret_manager_secret_iam_binding" "django_key" {
   secret_id = google_secret_manager_secret.django_key.id
   role      = "roles/secretmanager.secretAccessor"
   members   = [local.service_account]
-  depends_on = [google_project_service.required_services]
 }
 
 # Service permissions
@@ -224,14 +184,12 @@ resource "google_storage_bucket_iam_binding" "media_files" {
   bucket = google_storage_bucket.media_files.name
   role   = "roles/storage.admin"
   members = [local.service_account]
-  depends_on = [google_project_service.required_services]
 }
 
 resource "google_storage_bucket_iam_binding" "staticfiles" {
   bucket = google_storage_bucket.staticfiles.name
   role   = "roles/storage.admin"
   members = [local.service_account]
-  depends_on = [google_project_service.required_services]
 }
 
 # Permissions for Cloud Run to access Cloud SQL and Run
@@ -243,7 +201,6 @@ resource "google_project_iam_member" "service_roles" {
   project = var.project_id
   role    = "roles/${each.key}"
   member  = local.service_account
-  depends_on = [google_project_service.required_services]
 }
 
 
