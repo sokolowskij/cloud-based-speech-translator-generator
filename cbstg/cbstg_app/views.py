@@ -16,32 +16,15 @@ from django.utils import timezone
 from django.views.decorators.http import require_POST
 from google.cloud import storage, speech, texttospeech
 from google.cloud import translate_v2 as translate
-from pydub import AudioSegment
-from pydub.exceptions import CouldntDecodeError
-from django.core.cache import cache
+import soundfile as sf
+import numpy as np
+from scipy.signal import resample
 from .models import Role
 
 from .forms import SubmittedFileForm
 from .models import SubmittedFile
 from .limits import check_and_increment_limit, initialize_limit_if_needed, is_within_file_limit
 
-# @login_required
-# def submit_file(request):
-#     if request.method == 'POST':
-#         print("Post called")
-#         form = SubmittedFileForm(request.POST, request.FILES)
-#         if form.is_valid():
-#             print("Form is valid")
-#             submitted_text = form.save(commit=False)
-#             submitted_text.user = request.user
-#             try:
-#                 submitted_text.save()
-#             except Exception as e:
-#                 print(e)
-#             return redirect('notes_view')
-#     else:
-#         form = SubmittedFileForm()
-#     return render(request, 'notes/submit_file.html', {'form': form})
 
 @login_required
 def submit_file(request):
@@ -93,44 +76,6 @@ def submit_file(request):
         form = SubmittedFileForm()
     return render(request, 'notes/submit_file.html', {'form': form})
 
-
-# @login_required
-# def download_submitted(request, file_id):
-#     try:
-#         submitted_text = SubmittedFile.objects.get(id=file_id, user=request.user)
-#         print("Submitted text")
-#     except SubmittedFile.DoesNotExist:
-#         raise Http404("File not found.")
-#     try:
-#         file_path = submitted_text.file.name
-#         filename = submitted_text.file.name.split("/")[-1]
-
-#         # Initialize GCS client
-#         if settings.SERVICE_NAME is None:  # local development
-#             storage_client = storage.Client(credentials=settings.GS_CREDENTIALS)
-#         else:
-#             storage_client = storage.Client()
-
-#         bucket = storage_client.bucket(settings.GS_BUCKET_NAME)
-#         blob = bucket.blob(file_path)
-
-#         # Generate signed URL with download header
-#         url = blob.generate_signed_url(
-#             version="v4",
-#             expiration=timedelta(minutes=10),
-#             method="GET",
-#             response_disposition=f'attachment; filename="{filename}"',
-#         )
-#     except Exception as e:
-#         print(e)
-
-#     return HttpResponseRedirect(url)
-
-from django.http import HttpResponseRedirect, Http404
-from google.cloud import storage
-from datetime import timedelta
-from django.conf import settings
-from django.contrib.auth.decorators import login_required
 
 @login_required
 def download_submitted(request, file_id):
@@ -231,7 +176,7 @@ def transcribe_audio(request, file_id):
                     "transcript": None,
                     "error": "Daily STT limit exceeded."
                 })
-            
+
         except SubmittedFile.DoesNotExist:
             raise Http404("File not found.")
 
@@ -240,14 +185,23 @@ def transcribe_audio(request, file_id):
             with default_storage.open(submitted_file.file.name, "rb") as audio_file:
                 audio_data = io.BytesIO(audio_file.read())
 
-            # Convert stereo to mono
-            audio = AudioSegment.from_file(audio_data)
-            audio = audio.set_channels(1)  # Convert to mono
-            audio = audio.set_frame_rate(16000)  # Standardize sample rate
+            # Read the audio file
+            audio_data, sample_rate = sf.read(audio_data)  # or .flac, .ogg, etc.
+
+            # If stereo, convert to mono by averaging channels
+            if len(audio_data.shape) > 1 and audio_data.shape[1] > 1:
+                audio_data = np.mean(audio_data, axis=1)
+
+            # Resample to 16000 Hz if needed
+            target_rate = 16000
+            if sample_rate != target_rate:
+                num_samples = int(len(audio_data) * target_rate / sample_rate)
+                audio_data = resample(audio_data, num_samples)
+                sample_rate = target_rate
 
             # Save converted audio to memory
             wav_data = io.BytesIO()
-            audio.export(wav_data, format="wav")
+            sf.write(wav_data, audio_data, sample_rate, format='WAV')
             wav_data.seek(0)
 
             recognition_audio = speech.RecognitionAudio(content=wav_data.read())
@@ -338,7 +292,6 @@ def synthesize_speech(request, file_id):
         with default_storage.open(text_file.file.name, "rb") as f:
             text = extract_text_from_file(f, text_file.file.name)
 
-
         if not text.strip():
             raise ValueError("File is empty.")
 
@@ -416,6 +369,7 @@ def translate_text(text, target_language='en'):
     except Exception as e:
         print(f"Translation failed: {e}")
         return text, "Translation failed: " + str(e) + "\n"
+
 
 @login_required
 def change_role(request):
