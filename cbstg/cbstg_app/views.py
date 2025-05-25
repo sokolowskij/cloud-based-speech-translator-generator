@@ -2,7 +2,7 @@ import base64
 import io
 from datetime import timedelta
 import os
-import fitz
+import pymupdf
 
 from django.conf import settings
 from django.contrib.auth.decorators import login_required
@@ -275,7 +275,7 @@ def extract_text_from_file(file_obj, filename=None):
 
     elif ext == ".pdf":
         file_bytes = file_obj.read()
-        doc = fitz.open(stream=file_bytes, filetype="pdf")
+        doc = pymupdf.open(stream=file_bytes, filetype="pdf")
         text = ""
         for page in doc:
             text += page.get_text()
