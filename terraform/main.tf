@@ -26,6 +26,28 @@ resource "google_storage_bucket" "media_files" {
   name           = "${var.project_id}-media-files-new"
   location       = var.region
   force_destroy  = true
+
+  lifecycle_rule {
+    action {
+      type          = "SetStorageClass"
+      storage_class = "ARCHIVE"
+    }
+
+    condition {
+      age = 60
+    }
+  }
+
+  lifecycle_rule {
+    action {
+      type = "Delete"
+    }
+
+    condition {
+      age = 365
+    }
+  }
+
   depends_on = [google_project_service.required_services]
 }
 

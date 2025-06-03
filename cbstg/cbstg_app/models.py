@@ -2,6 +2,7 @@ from django.db import models
 from django.conf import settings
 from django.contrib.auth.models import AbstractUser
 
+
 # Create your models here.
 
 class Role(models.Model):
@@ -15,15 +16,12 @@ class Role(models.Model):
     class Meta:
         db_table = 'roles'
 
+
 class CustomUser(AbstractUser):
     role = models.ForeignKey(Role, on_delete=models.SET_DEFAULT, default=1)
+
 
 class SubmittedFile(models.Model):
     user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
     file = models.FileField(upload_to="textfiles/textsubmissions")
-    creation_date = models.DateField(auto_now_add=True)
-
-class TranslatedText(models.Model):
-    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
-    file = models.FileField(upload_to="textfiles/texttranslations")
     creation_date = models.DateField(auto_now_add=True)
