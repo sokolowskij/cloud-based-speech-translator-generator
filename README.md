@@ -25,7 +25,8 @@ Main features:
    ```bash
    pip install -r requirements.txt
    ```
-3. Set up everything with terraform
+3. Create files terraform.tfvars (look at template terraform.tfvars.tmp) and local_secrets.py (look at template local_secrets.tmp)
+4. Set up everything with terraform
 ```bash
    terraform init
 ```
@@ -35,4 +36,4 @@ Main features:
    ```bash
    terraform apply
    ```
-4. Go to the returned url
+5. Go to the returned url
