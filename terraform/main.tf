@@ -272,10 +272,6 @@ resource "google_project_iam_member" "service_roles" {
 # Build the application image that the Cloud Run service and jobs will use
 resource "terraform_data" "cbstg_app" {
 
-  triggers_replace = {
-    app_code = sha256(join("", [for f in fileset("${path.module}/../cbstg", "**/*.py"): filesha256("${path.root}/../cbstg/${f}")]))
-  }
-
   provisioner "local-exec" {
     working_dir = "${path.module}/../cbstg"
     command     = "gcloud builds submit --pack image=${local.image} ."
